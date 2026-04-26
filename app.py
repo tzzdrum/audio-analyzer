@@ -54,30 +54,50 @@ if uploaded_file is not None:
             # Calculate Pearson correlation coefficient between L and R
             correlation = np.corrcoef(data[0], data[1])[0, 1]
 
-        # --- UI DISPLAY WITH REFERENCE RANGES ---
+        # --- UI DISPLAY WITH COMPARATIVE REFERENCE TABLES ---
         st.subheader("📊 Quantitative Analysis")
         
         m_col1, m_col2, m_col3, m_col4, m_col5 = st.columns(5)
         
+        # Helper function to generate reference table
+        def get_ref_table(data):
+            return "<table style='width:100%; font-size:11px;'><tr><th>Genre</th><th>Range</th></tr>" + \
+                   "".join([f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in data.items()]) + "</table>"
+
         # 1. Loudness
         m_col1.metric("Loudness", f"{integrated_loudness:.1f} LUFS")
-        m_col1.caption("Target: -14 to -10 LUFS")
+        m_col1.markdown(get_ref_table({
+            "Pop/EDM": "-10 to -8",
+            "Hip-Hop": "-11 to -9",
+            "Rock": "-12 to -10",
+            "Jazz/Class.": "-18 to -14"
+        }), unsafe_allow_html=True)
         
         # 2. True Peak
         m_col2.metric("True Peak", f"{true_peak_db:.2f} dBTP")
-        m_col2.caption("Target: <= -1.0 dBTP")
+        m_col2.caption("Global Std: <= -1.0")
         
-        # 3. LU Range
-        m_col3.metric("LU Range (LRA)", f"{lra:.1f} LU")
-        m_col3.caption("Typical: 4 to 10 LU")
+        # 3. LU Range (LRA)
+        m_col3.metric("LU Range", f"{lra:.1f} LU")
+        m_col3.markdown(get_ref_table({
+            "Jazz/Class.": "8 to 15",
+            "Rock": "5 to 8",
+            "Hip-Hop": "4 to 7",
+            "Pop/EDM": "3 to 6"
+        }), unsafe_allow_html=True)
         
         # 4. Crest Factor
         m_col4.metric("Crest Factor", f"{crest_factor:.2f}")
-        m_col4.caption("Healthy: 4.0 to 10.0")
+        m_col4.markdown(get_ref_table({
+            "Jazz/Class.": "8 to 12",
+            "Rock": "6 to 8",
+            "Hip-Hop": "5 to 7",
+            "Pop/EDM": "4 to 6"
+        }), unsafe_allow_html=True)
         
         # 5. Correlation
         m_col5.metric("Correlation", f"{correlation:.2f}")
-        m_col5.caption("Ideal: 0.2 to 0.9")
+        m_col5.caption("Ideal Range: 0.2 to 0.9")
 
         st.divider()
 
