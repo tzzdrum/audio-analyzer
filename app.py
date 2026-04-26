@@ -2,72 +2,119 @@ import streamlit as st
 import librosa
 import numpy as np
 import pyloudnorm as pyln
-import soundfile as sf
 import matplotlib.pyplot as plt
 import io
 
-st.set_page_config(page_title="Audio Analyzer Pro", layout="centered")
+# Page Configuration
+st.set_page_config(page_title="Audio Analyzer Plus", layout="wide")
 
-st.title("🎵 Audio Quality Analyzer")
-st.write("Carica il tuo brano (WAV o MP3) per un'analisi tecnica gratuita del mix e mastering.")
+# Custom CSS for better UI
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    .stMetric { background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d; }
+    </style>
+    """, unsafe_allow_html=True)
 
-uploaded_file = st.file_uploader("Scegli un file audio", type=["wav", "mp3"])
+st.title("🎵 Audio Analyzer Plus")
+st.write("Professional mix and mastering diagnostic tool. Upload your track to get an instant technical report.")
+
+uploaded_file = st.file_uploader("Upload your track (WAV or MP3)", type=["wav", "mp3"])
 
 if uploaded_file is not None:
-    with st.spinner('Analizzando il brano... attendi...'):
-        # 1. Caricamento Audio
-        # Leggiamo i dati binari
+    with st.spinner('Analyzing audio signal... please wait.'):
+        # 1. Load Audio (Stereo is mandatory for correlation)
         audio_bytes = uploaded_file.read()
         data, rate = librosa.load(io.BytesIO(audio_bytes), sr=None, mono=False)
         
-        # Convertiamo in formato adatto per pyloudnorm (L, R, samples)
-        if len(data.shape) > 1:
-            data_pyln = data.T
+        # Ensure data is in (Samples, Channels) format for analysis
+        if data.ndim == 1:
+            st.warning("⚠️ The uploaded file is Mono. Stereo Correlation analysis cannot be performed.")
+            is_stereo = False
+            data_stereo = data.reshape(-1, 1)
         else:
-            data_pyln = data.reshape(-1, 1)
+            is_stereo = True
+            data_stereo = data.T # Transpose to (Samples, 2)
 
-        # 2. Analisi Loudness (LUFS)
-        meter = pyln.Meter(rate) # Standard ITU-R BS.1770-4
-        loudness = meter.integrated_loudness(data_pyln)
+        # 2. Loudness Analysis (LUFS & LRA)
+        meter = pyln.Meter(rate)
+        integrated_loudness = meter.integrated_loudness(data_stereo)
+        lra = meter.loudness_range(data_stereo)
+
+        # 3. Peak and Crest Factor
+        peak_linear = np.max(np.abs(data))
+        true_peak_db = 20 * np.log10(peak_linear) if peak_linear > 0 else -100
         
-        # 3. Analisi Peak
-        true_peak = np.max(np.abs(data))
-        true_peak_db = 20 * np.log10(true_peak) if true_peak > 0 else -100
+        rms_level = np.sqrt(np.mean(data**2))
+        crest_factor = peak_linear / rms_level if rms_level > 0 else 0
 
-        # 4. Visualizzazione Risultati
-        st.subheader("📊 Parametri Rilevati")
-        col1, col2 = st.columns(2)
-        col1.metric("Loudness (Integrated)", f"{loudness:.2f} LUFS")
-        col2.metric("True Peak", f"{true_peak_db:.2f} dB")
+        # 4. Phase Correlation (only for stereo)
+        correlation = 0
+        if is_stereo:
+            # Calculate Pearson correlation coefficient between L and R
+            correlation = np.corrcoef(data[0], data[1])[0, 1]
 
-        # --- LOGICA DI FEEDBACK ---
+        # --- UI DISPLAY ---
+        st.subheader("📊 Quantitative Analysis")
+        
+        m_col1, m_col2, m_col3, m_col4, m_col5 = st.columns(5)
+        m_col1.metric("Loudness", f"{integrated_loudness:.1f} LUFS")
+        m_col2.metric("True Peak", f"{true_peak_db:.2f} dBTP")
+        m_col3.metric("LU Range (LRA)", f"{lra:.1f} LU")
+        m_col4.metric("Crest Factor", f"{crest_factor:.2f}")
+        m_col5.metric("Correlation", f"{correlation:.2f}")
+
         st.divider()
-        st.subheader("💡 Feedback e Consigli")
+
+        # --- TECHNICAL FEEDBACK ---
+        st.subheader("💡 Technical Feedback & Improvements")
         
-        recommendations = []
+        col_fb1, col_fb2 = st.columns(2)
 
-        # Controllo LUFS (Target Streaming -14)
-        if loudness > -10:
-            recommendations.append("🔴 **Volume troppo alto:** Il brano è molto compresso. Le piattaforme (Spotify/YT) lo abbasseranno drasticamente. Considera di ridurre il limiter.")
-        elif loudness < -16:
-            recommendations.append("🟡 **Volume basso:** Il brano potrebbe suonare troppo piano rispetto alla media. Hai spazio per spingere un po' di più il mastering.")
+        with col_fb1:
+            st.markdown("### 🎚️ Dynamic & Level")
+            # Loudness Logic
+            if integrated_loudness > -10:
+                st.error("**Oversquashed:** Your track is very loud. It will be turned down by streaming platforms. Try to ease up on the Limiter.")
+            elif integrated_loudness < -15:
+                st.warning("**Low Level:** The track might sound quiet. You have headroom to increase the loudness for a more competitive master.")
+            else:
+                st.success("**Target Reached:** Your loudness is ideal for modern streaming standards.")
+
+            # Peak Logic
+            if true_peak_db > -0.5:
+                st.error("**Clipping Risk:** Peaks are too close to 0dB. Lower your Limiter's Ceiling to -1.0 dBTP to avoid inter-sample peaks.")
+            
+            # LRA Logic
+            if lra < 4:
+                st.info("**Small LRA:** Very consistent volume, typical of heavy EDM/Pop. If this is Jazz/Rock, you might be over-compressing.")
+
+        with col_fb2:
+            st.markdown("### 🧬 Stereo & Phase")
+            if is_stereo:
+                if correlation < 0:
+                    st.error("**Phase Issues:** Negative correlation detected. Your track will lose significant elements (like bass or vocals) when played in Mono.")
+                elif correlation < 0.4:
+                    st.warning("**Wide/Thin:** Low correlation. The mix is very wide, but check for mono compatibility.")
+                else:
+                    st.success("**Solid Phase:** Good correlation. The track will sound great even on mono speakers (phones, clubs).")
+            else:
+                st.info("Mono file: No phase correlation available.")
+
+        # --- VISUALIZATION ---
+        st.subheader("📈 Waveform Visualization")
+        fig, ax = plt.subplots(figsize=(12, 4))
+        ax.set_facecolor('#0e1117')
+        fig.patch.set_facecolor('#0e1117')
+        
+        if is_stereo:
+            librosa.display.waveshow(data[0], sr=rate, ax=ax, alpha=0.5, label='Left', color='#00d1ff')
+            librosa.display.waveshow(data[1], sr=rate, ax=ax, alpha=0.5, label='Right', color='#ff007c')
         else:
-            recommendations.append("🟢 **Ottimo Volume:** Sei nel range ideale per lo streaming moderno (-14 / -12 LUFS).")
-
-        # Controllo Peak
-        if true_peak_db > -0.5:
-            recommendations.append("🔴 **Rischio Clipping:** Il picco è troppo vicino allo 0dB. Abbassa l'output del limiter a -1.0 dB per evitare distorsioni dopo la conversione in MP3.")
-        else:
-            recommendations.append("🟢 **Headroom Corretta:** I picchi sono sotto controllo.")
-
-        for rec in recommendations:
-            st.write(rec)
-
-        # 5. Grafico Waveform
-        st.subheader("📈 Visualizzazione Onda")
-        fig, ax = plt.subplots(figsize=(10, 3))
-        librosa.display.waveshow(data, sr=rate, ax=ax, alpha=0.5)
-        ax.set_title("Waveform")
+            librosa.display.waveshow(data, sr=rate, ax=ax, color='#00d1ff')
+        
+        ax.legend()
+        ax.tick_params(colors='white')
         st.pyplot(fig)
 
-st.info("Nota: Questa app processa i file in memoria. Nessun file viene salvato sui nostri server.")
+st.caption("Audio Analyzer Plus | Developed for Producers & Engineers | 100% Private Analysis")
