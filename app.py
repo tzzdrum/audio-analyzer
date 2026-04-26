@@ -117,33 +117,47 @@ if uploaded_file is not None:
         ax.tick_params(colors='white')
         st.pyplot(fig)
 
-        # --- NEW: SPECTRUM ANALYSIS (EQ) ---
+      # --- ENHANCED: SPECTRUM ANALYSIS (EQ) WITH REFERENCE ---
         st.subheader("🔊 Spectral Frequency Analysis")
-        st.write("Visual representation of the frequency balance (average spectrum).")
+        st.write("Average frequency balance vs. Pink Noise Reference (-3dB/octave).")
         
         # Calculate FFT
         n_fft = 2048
-        # Get the mean spectrum across time
         spec = np.abs(librosa.stft(data[0] if is_stereo else data, n_fft=n_fft))
         mean_spec = np.mean(spec, axis=1)
         freqs = librosa.fft_frequencies(sr=rate, n_fft=n_fft)
         
-        # Plot Spectrum
+        # Prepare data for plotting
+        db_spec = 20 * np.log10(mean_spec[1:] + 1e-6)
+        
+        # Create Reference Curve (Pink Noise slope: -3dB per octave)
+        # We normalize the reference to match the peak of the track
+        ref_curve = -3 * np.log2(freqs[1:] / 1000) + (np.max(db_spec) - 10)
+        
+        # Plot
         fig_spec, ax_spec = plt.subplots(figsize=(12, 4))
         ax_spec.set_facecolor('#0e1117')
         fig_spec.patch.set_facecolor('#0e1117')
         
-        # Use log scale for frequencies
-        ax_spec.semilogx(freqs[1:], 20 * np.log10(mean_spec[1:] + 1e-6), color='#00ff9f')
+        # Plot track spectrum
+        ax_spec.semilogx(freqs[1:], db_spec, color='#00ff9f', label='Track Spectrum', linewidth=1.5)
+        # Plot reference curve
+        ax_spec.semilogx(freqs[1:], ref_curve, color='#ff007c', linestyle='--', label='Target Balance (-3dB/oct)', alpha=0.7)
         
+        # Highlights at 20Hz and 20kHz
+        for f in [20, 20000]:
+            ax_spec.axvline(x=f, color='white', linestyle=':', alpha=0.5)
+            ax_spec.text(f, ax_spec.get_ylim()[0], f' {f}Hz', color='white', fontsize=8, rotation=90)
+            
         ax_spec.set_xlabel('Frequency (Hz)', color='white')
         ax_spec.set_ylabel('Magnitude (dB)', color='white')
+        ax_spec.set_xlim([20, 20000])
         ax_spec.tick_params(colors='white')
-        ax_spec.grid(True, which='both', linestyle='--', alpha=0.3)
+        ax_spec.grid(True, which='both', linestyle='--', alpha=0.2)
+        ax_spec.legend(loc='upper right')
         
         st.pyplot(fig_spec)
         
-        st.info("Tip: Look for a gentle downward slope (typical for 'Pink Noise' balance). "
-                "Extreme spikes at 50Hz or below might indicate rumble, "
-                "while a flat line at the top might indicate a harsh high-end.")
-st.caption("Audio Analyzer Plus | Developed for Producers & Engineers | 100% Private Analysis")
+        st.info("Analysis: If your green line stays close to the pink dashed line, your mix balance is likely correct. "
+                "Large deviations indicate masking, lack of body, or excessive harshness.")
+st.caption("Audio Analyzer Plus | Developed by VentenaStudios for Producers & Engineers | 100% Private Analysis")
