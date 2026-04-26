@@ -44,7 +44,18 @@ if uploaded_file is not None:
 
         # 3. Peak and Crest Factor
         peak_linear = np.max(np.abs(data))
-        true_peak_db = 20 * np.log10(peak_linear) if peak_linear > 0 else -100
+
+        # CORREZIONE: Pyloudnorm non ha una funzione diretta "get_true_peak", 
+        # quindi aggiungiamo una funzione di stima corretta:
+        def get_true_peak(data, rate):
+            # Oversampling di 4x per catturare gli inter-sample peaks
+            from scipy.signal import resample_poly
+            data_oversampled = resample_poly(data, 4, 1)
+            return 20 * np.log10(np.max(np.abs(data_oversampled)))
+
+        true_peak_db = get_true_peak(data_stereo, rate)
+        
+        # OLD true_peak_db = 20 * np.log10(peak_linear) if peak_linear > 0 else -100
         
         rms_level = np.sqrt(np.mean(data**2))
         crest_factor = peak_linear / rms_level if rms_level > 0 else 0
