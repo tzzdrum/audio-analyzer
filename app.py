@@ -16,6 +16,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+st.title("VENTENA STUDIOS TOOLS")
 st.title("🎵 Audio Analyzer Plus")
 st.write("Professional mix and mastering diagnostic tool. Upload your track to get an instant technical report.")
 
