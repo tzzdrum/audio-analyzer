@@ -54,15 +54,30 @@ if uploaded_file is not None:
             # Calculate Pearson correlation coefficient between L and R
             correlation = np.corrcoef(data[0], data[1])[0, 1]
 
-        # --- UI DISPLAY ---
+        # --- UI DISPLAY WITH REFERENCE RANGES ---
         st.subheader("📊 Quantitative Analysis")
         
         m_col1, m_col2, m_col3, m_col4, m_col5 = st.columns(5)
+        
+        # 1. Loudness
         m_col1.metric("Loudness", f"{integrated_loudness:.1f} LUFS")
+        m_col1.caption("Target: -14 to -10 LUFS")
+        
+        # 2. True Peak
         m_col2.metric("True Peak", f"{true_peak_db:.2f} dBTP")
+        m_col2.caption("Target: <= -1.0 dBTP")
+        
+        # 3. LU Range
         m_col3.metric("LU Range (LRA)", f"{lra:.1f} LU")
+        m_col3.caption("Typical: 4 to 10 LU")
+        
+        # 4. Crest Factor
         m_col4.metric("Crest Factor", f"{crest_factor:.2f}")
+        m_col4.caption("Healthy: 4.0 to 10.0")
+        
+        # 5. Correlation
         m_col5.metric("Correlation", f"{correlation:.2f}")
+        m_col5.caption("Ideal: 0.2 to 0.9")
 
         st.divider()
 
