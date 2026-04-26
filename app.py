@@ -117,4 +117,33 @@ if uploaded_file is not None:
         ax.tick_params(colors='white')
         st.pyplot(fig)
 
+        # --- NEW: SPECTRUM ANALYSIS (EQ) ---
+        st.subheader("🔊 Spectral Frequency Analysis")
+        st.write("Visual representation of the frequency balance (average spectrum).")
+        
+        # Calculate FFT
+        n_fft = 2048
+        # Get the mean spectrum across time
+        spec = np.abs(librosa.stft(data[0] if is_stereo else data, n_fft=n_fft))
+        mean_spec = np.mean(spec, axis=1)
+        freqs = librosa.fft_frequencies(sr=rate, n_fft=n_fft)
+        
+        # Plot Spectrum
+        fig_spec, ax_spec = plt.subplots(figsize=(12, 4))
+        ax_spec.set_facecolor('#0e1117')
+        fig_spec.patch.set_facecolor('#0e1117')
+        
+        # Use log scale for frequencies
+        ax_spec.semilogx(freqs[1:], 20 * np.log10(mean_spec[1:] + 1e-6), color='#00ff9f')
+        
+        ax_spec.set_xlabel('Frequency (Hz)', color='white')
+        ax_spec.set_ylabel('Magnitude (dB)', color='white')
+        ax_spec.tick_params(colors='white')
+        ax_spec.grid(True, which='both', linestyle='--', alpha=0.3)
+        
+        st.pyplot(fig_spec)
+        
+        st.info("Tip: Look for a gentle downward slope (typical for 'Pink Noise' balance). "
+                "Extreme spikes at 50Hz or below might indicate rumble, "
+                "while a flat line at the top might indicate a harsh high-end.")
 st.caption("Audio Analyzer Plus | Developed for Producers & Engineers | 100% Private Analysis")
